@@ -378,13 +378,14 @@ All experimental code, trained models, and raw data are available at:
 
 Dependencies: Python 3.10, PyTorch 2.0, NumPy 1.24, scikit-learn 1.3, ripser 0.6.
 
-Compute: NVIDIA RTX 4070 / A100 equivalent. ~2 hours for 20-seed run.
+Compute: Standard desktop CPU (Intel i7 or equivalent). ~1 hour for 20-seed run.
 
 ---
 
 ## Acknowledgments
 
-This work emerged from independent research by CK Hung, with iterative development and peer review by AI assistants (Claude Opus 4, Gemini Flash). 
+This work emerged from independent research by CK Hung (Emmy Team, Amoy Studio), 
+with iterative development and peer review by AI assistants (Claude Opus 4, Gemini Flash). 
 The author acknowledges the open-source community for tools (Ripser, PyTorch, NumPy) that enabled rapid experimentation.
 
 Funding: None (independent research).
