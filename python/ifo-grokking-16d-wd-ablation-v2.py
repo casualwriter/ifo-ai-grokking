@@ -1,10 +1,9 @@
-
 """
-IFO Grokking V16.4: Weight Decay Ablation Study (WD = 0.0)
-Tests if the Step 22000 collapse and generalization behavior persist 
-when weight decay is completely disabled.
+IFO Grokking V16.5: Weight Decay Ablation Study (WD = 0.0 vs WD = 0.2)
+Directly compares the crystallization trajectory of causal structures 
+with and without weight decay.
 
-CK Hung & Echo, 2026/6/2
+Emmy Team, Amoy Studio. 2026/06/15
 """
 
 import warnings
@@ -80,15 +79,20 @@ def calculate_ccc(model, table, inverses, device):
         preds1 = logits1.argmax(dim=1).cpu().numpy()
         
         step2_inputs = []
+        targets_a = []
+        
         for idx, (a, b) in enumerate(zip(all_pairs[:, 0].cpu().numpy(), all_pairs[:, 1].cpu().numpy())):
-            true_ab = table[a, b]
-            inv_ab = inverses[true_ab]
-            step2_inputs.append([preds1[idx], inv_ab])
+            inv_b = inverses[b] 
+            step2_inputs.append([preds1[idx], inv_b])
+            targets_a.append(a)
             
         step2_inputs = torch.tensor(step2_inputs, dtype=torch.long, device=device)
         logits2 = model(step2_inputs)
         preds2 = logits2.argmax(dim=1).cpu().numpy()
-        ccc = np.sum(preds2 == 0) / 576.0
+        
+        targets_a = np.array(targets_a)
+        ccc = np.sum(preds2 == targets_a) / 576.0
+        
     return ccc
 
 def calculate_pr_volume(embed_weights):
@@ -101,9 +105,9 @@ def calculate_pr_volume(embed_weights):
     return (sum_lambda**2) / sum_lambda_sq
 
 # ============================================================
-# Ablation Runner (WD = 0.0)
+# Ablation Runner (Supports WD configuration)
 # ============================================================
-def run_ablation(seed):
+def run_ablation(seed, wd):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     table, inverses = get_d12_table_and_inverses()
     train_data, val_data = generate_fixed_d12_data(train_fraction=0.7, split_seed=42)
@@ -112,21 +116,19 @@ def run_ablation(seed):
     np.random.seed(seed)
     
     model = DihedralNet().to(device)
-    # Set weight_decay to 0.0
-    optimizer = optim.AdamW(model.parameters(), lr=1e-3, weight_decay=0.0)
+    optimizer = optim.AdamW(model.parameters(), lr=1e-3, weight_decay=wd)
     criterion = nn.CrossEntropyLoss()
     
     X_train, y_train = train_data[0].to(device), train_data[1].to(device)
     X_val, y_val = val_data[0].to(device), val_data[1].to(device)
     
     print(f"\n==============================================================")
-    print(f"=== ABLATION STUDY: SEED {seed} (WD = 0.0) ===")
+    print(f"=== ABLATION STUDY: SEED {seed} (WD = {wd}) ===")
     print(f"==============================================================")
     print(f"{'Step':<6} | {'Loss':<8} | {'ValAcc':<6} | {'CCC':<6} | {'PR':<6} | {'EmbNorm':<8} | {'FC1Norm':<8}")
     print("-" * 70)
     
     for step in range(25001):
-        # Uniform sampling every 1000 steps
         if step % 1000 == 0:
             model.eval()
             with torch.no_grad():
@@ -146,7 +148,6 @@ def run_ablation(seed):
             
             print(f"{step:<6d} | {train_loss:<8.5f} | {val_acc:<6.3f} | {ccc:<6.3f} | {pr:<6.2f} | {emb_norm:<8.3f} | {fc1_norm:<8.3f}")
             
-        # Training step
         model.train()
         optimizer.zero_grad()
         logits = model(X_train)
@@ -155,5 +156,10 @@ def run_ablation(seed):
         optimizer.step()
 
 if __name__ == "__main__":
-    run_ablation(1)
-    run_ablation(2)
+    # 跑 Seed 1 的對照
+    run_ablation(seed=1, wd=0.0)
+    run_ablation(seed=1, wd=0.2)
+    
+    # 跑 Seed 2 的對照
+    run_ablation(seed=2, wd=0.0)
+    run_ablation(seed=2, wd=0.2)

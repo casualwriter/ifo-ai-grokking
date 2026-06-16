@@ -1,0 +1,18 @@
+G:\My Drive\amoy\IFO\python>ifo-grokking-t3-shuffle-baseline_v2.py
+============================================================
+RUNNING TEST 1: 100 UNTRAINED MODELS BASELINE
+============================================================
+Untrained Baseline (N=100) over 5 Shuffled Encodings:
+-> Parity Accuracy Chance Level: 49.62% ± 3.65%
+-> CCC Chance Level:             5.34% ± 1.41%
+
+
+============================================================
+RUNNING TEST 2: STEP 500 SHUFFLED INDEX TRAIN (5 SEEDS)
+============================================================
+Shuffle Seed 1 | Step 500 | Val Acc: 0.0% | Parity Acc: 57.2% | CCC: 7.5%
+Shuffle Seed 2 | Step 500 | Val Acc: 0.0% | Parity Acc: 49.7% | CCC: 4.0%
+Shuffle Seed 3 | Step 500 | Val Acc: 1.7% | Parity Acc: 83.8% | CCC: 9.2%
+Shuffle Seed 4 | Step 500 | Val Acc: 1.2% | Parity Acc: 56.1% | CCC: 1.7%
+Shuffle Seed 5 | Step 500 | Val Acc: 0.6% | Parity Acc: 43.4% | CCC: 5.2%
+============================================================

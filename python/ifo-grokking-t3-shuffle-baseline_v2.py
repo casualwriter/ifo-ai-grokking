@@ -1,5 +1,4 @@
-
-# ifo-grokking-t3-shuffle-baseline.py
+# ifo-grokking-t3-shuffle-baseline.py (Revised to Unified CCC)
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -7,7 +6,6 @@ import numpy as np
 
 # 1. Define D12 Group Structure
 def get_d12_table():
-    # 0-11: rotations (r^0 to r^11), 12-23: reflections (s to sr^11)
     table = np.zeros((24, 24), dtype=int)
     for i in range(24):
         for j in range(24):
@@ -17,16 +15,12 @@ def get_d12_table():
             b_val = j % 12
             
             if not a_is_ref and not b_is_ref:
-                # rot * rot = rot
                 res = (a_val + b_val) % 12
             elif not a_is_ref and b_is_ref:
-                # rot * ref = ref
                 res = 12 + (b_val - a_val) % 12
             elif a_is_ref and not b_is_ref:
-                # ref * rot = ref
                 res = 12 + (a_val + b_val) % 12
             else:
-                # ref * ref = rot
                 res = (b_val - a_val) % 12
             table[i, j] = res
     return table
@@ -48,7 +42,6 @@ class GroupMLP(nn.Module):
         self.relu = nn.ReLU()
         
     def forward(self, x):
-        # x shape: [batch, 2]
         emb_a = self.emb(x[:, 0])
         emb_b = self.emb(x[:, 1])
         x_concat = torch.cat([emb_a, emb_b], dim=1)
@@ -83,24 +76,25 @@ def evaluate_metrics(model, inputs, targets, perm, inv_perm):
     true_parity = targets_orig >= 12
     parity_acc = np.mean(pred_parity == true_parity)
     
-    # 3. Cycle Closure Count (CCC)
-    # Test if Net(c', c^-1) == e
+    # 3. Cycle Closure Count (CCC) - Unified Eq. 1: Net(Net(a, b), b^-1) == a
     ccc_correct = 0
     for idx in range(len(inputs)):
-        c_prime = preds_orig[idx]
-        c_orig = targets_orig[idx]
-        c_inv = D12_INV[c_orig]
+        a_orig = inputs_orig[idx][0]
+        b_orig = inputs_orig[idx][1]
+        c_prime = preds_orig[idx]      # Net(a, b) prediction
+        
+        b_inv = D12_INV[b_orig]        # b^-1
         
         # Map back to shuffled tokens to feed into network
         c_prime_shuf = perm[c_prime]
-        c_inv_shuf = perm[c_inv]
+        b_inv_shuf = perm[b_inv]
         
-        test_input = torch.tensor([[c_prime_shuf, c_inv_shuf]], device=inputs.device)
+        test_input = torch.tensor([[c_prime_shuf, b_inv_shuf]], device=inputs.device)
         with torch.no_grad():
             test_pred = torch.argmax(model(test_input), dim=1).item()
         test_pred_orig = inv_perm[test_pred]
         
-        if test_pred_orig == 0:  # 0 is identity
+        if test_pred_orig == a_orig:  # Restoration of 'a'
             ccc_correct += 1
             
     ccc = ccc_correct / len(inputs)
@@ -113,7 +107,6 @@ print("="*60)
 print("RUNNING TEST 1: 100 UNTRAINED MODELS BASELINE")
 print("="*60)
 
-# Generate full dataset
 inputs_all = []
 targets_all = []
 for i in range(24):
@@ -123,7 +116,6 @@ for i in range(24):
 inputs_all = np.array(inputs_all)
 targets_all = np.array(targets_all)
 
-# Train/Val Split (70/30, seed 42)
 np.random.seed(42)
 indices = np.random.permutation(576)
 train_size = int(0.7 * 576)
@@ -137,14 +129,13 @@ baseline_cccs = []
 for shuffle_seed in range(1, 6):
     perm, inv_perm = get_shuffled_map(shuffle_seed)
     
-    # Map dataset to shuffled tokens
     shuf_inputs = perm[inputs_all]
     shuf_targets = perm[targets_all]
     
     val_in_tensor = torch.tensor(shuf_inputs[val_idx], dtype=torch.long, device=device)
     val_tar_tensor = torch.tensor(shuf_targets[val_idx], dtype=torch.long, device=device)
     
-    for init_seed in range(20):  # 20 seeds per shuffle configuration = 100 runs total
+    for init_seed in range(20):
         torch.manual_seed(init_seed)
         model = GroupMLP().to(device)
         _, parity_acc, ccc = evaluate_metrics(model, val_in_tensor, val_tar_tensor, perm, inv_perm)
@@ -166,7 +157,6 @@ print("="*60)
 for shuffle_seed in range(1, 6):
     perm, inv_perm = get_shuffled_map(shuffle_seed)
     
-    # Map dataset to shuffled tokens
     shuf_inputs = perm[inputs_all]
     shuf_targets = perm[targets_all]
     
@@ -175,8 +165,7 @@ for shuffle_seed in range(1, 6):
     val_in_tensor = torch.tensor(shuf_inputs[val_idx], dtype=torch.long, device=device)
     val_tar_tensor = torch.tensor(shuf_targets[val_idx], dtype=torch.long, device=device)
     
-    # Train model
-    torch.manual_seed(shuffle_seed + 100)  # Distinct init seed
+    torch.manual_seed(shuffle_seed + 100)
     model = GroupMLP().to(device)
     optimizer = optim.AdamW(model.parameters(), lr=1e-3, weight_decay=0.2)
     criterion = nn.CrossEntropyLoss()
